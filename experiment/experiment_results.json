@@ -1,0 +1,27 @@
+{
+  "workload": {
+    "requests": 100,
+    "debit_amount": 50.0,
+    "concurrency": 25
+  },
+  "unsafe": {
+    "initial_balance": 10000.0,
+    "expected_balance": 5000.0,
+    "actual_balance": 9450.0,
+    "discrepancy": 4450.0,
+    "lost_updates": 89,
+    "corruption_rate_pct": 89.0,
+    "tps": 853.75
+  },
+  "safe": {
+    "initial_balance": 10000.0,
+    "expected_balance": 5000.0,
+    "actual_balance": 5000.0,
+    "discrepancy": 0.0,
+    "corruption_rate_pct": 0.0,
+    "tps": 942.98,
+    "latency_p50_ms": 24.09,
+    "latency_p95_ms": 32.86,
+    "latency_p99_ms": 42.26
+  }
+}

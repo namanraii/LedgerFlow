@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ledgerflow-postgres
+    environment:
+      POSTGRES_DB: ledgerflow
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ledgerflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: ledgerflow-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ledger-service:
+    build: ./ledger-service
+    container_name: ledgerflow-ledger
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: postgres
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ledgerflow
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgrespassword
+    ports:
+      - "8081:8081"
+
+  fraud-service:
+    build: ./fraud-service
+    container_name: ledgerflow-fraud
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+    ports:
+      - "8000:8000"
+
+  notification-service:
+    build: ./notification-service
+    container_name: ledgerflow-notification
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+    ports:
+      - "8003:8003"
+
+  ingestion-service:
+    build: ./ingestion-service
+    container_name: ledgerflow-ingestion
+    depends_on:
+      - ledger-service
+      - fraud-service
+    environment:
+      LEDGER_SERVICE_URL: http://ledger-service:8081
+      FRAUD_SERVICE_URL: http://fraud-service:8000
+    ports:
+      - "8082:8082"
+
+  ops-dashboard:
+    build: ./ops-dashboard
+    container_name: ledgerflow-dashboard
+    depends_on:
+      - ledger-service
+    ports:
+      - "5173:80"
+
+volumes:
+  postgres_data:
