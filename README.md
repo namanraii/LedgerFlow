@@ -219,6 +219,20 @@ The desk is at `http://127.0.0.1:5188`. Fraud is published on 8010. Postgres is 
 
 The desk and the four APIs share one origin. The browser calls `/svc/ledger`, `/svc/ingestion`, `/svc/fraud`, and `/svc/notify`, and the desk proxies those to the services. A public tunnel only needs to expose port 5188.
 
+### Public address
+
+While this computer is running the Compose stack, the desk is also published at:
+
+https://tribune-mph-closer-fusion.trycloudflare.com
+
+Start or replace that address with:
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:5188 --no-autoupdate
+```
+
+Browsers can show an "unsafe site" warning on that link. The certificate is valid HTTPS for `trycloudflare.com`. Chrome, Safari, and Firefox flag the name because account-less `trycloudflare.com` tunnels are a shared pattern often used for phishing, and Google Safe Browsing blocks the pattern before the page loads. The warning is about the tunnel hostname, not a bad certificate and not the ledger application. A hostname you own, pointed at a named Cloudflare tunnel or a normal host, does not carry that warning. The quick-tunnel address stays up only while this machine, Docker, and `cloudflared` stay up. There is no login, so the book is public.
+
 ---
 
 ## 9. Security Scope & Deliberate Simplifications
