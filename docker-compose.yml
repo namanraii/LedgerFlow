@@ -54,7 +54,7 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
     ports:
-      - "8000:8000"
+      - "8010:8000"
 
   notification-service:
     build: ./notification-service
@@ -86,7 +86,7 @@ services:
     depends_on:
       - ledger-service
     ports:
-      - "5173:80"
+      - "5188:80"
 
 volumes:
   postgres_data:

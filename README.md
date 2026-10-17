@@ -104,11 +104,13 @@ CREATE TABLE transactions (
     transaction_id      BIGSERIAL PRIMARY KEY,
     idempotency_key     UUID NOT NULL UNIQUE,
     account_id          BIGINT NOT NULL REFERENCES accounts(account_id),
+    counterparty_account_id BIGINT,
     amount              NUMERIC(14,2) NOT NULL CHECK (amount > 0),
     transaction_type    VARCHAR(20) NOT NULL,
     status              VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     risk_score          NUMERIC(5,4),
     fraud_check_status  VARCHAR(20) DEFAULT 'OK',
+    memo                VARCHAR(160),
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -162,10 +164,11 @@ ORDER BY f.risk_score DESC;
 
 ## 6. User-Centered Design Rationale for Ops Dashboard
 
-The **LedgerFlow Operations Dashboard** is engineered around a *triage-first workflow* for bank risk analysts:
-- **Priority-Ranked Queue:** Highlights unreviewed high-risk transactions first, ordered by risk score and account risk rank.
-- **Authority Delegation:** The dashboard maintains zero financial business logic; Approve and Block actions trigger state transitions exclusively through the authoritative Ledger API.
-- **Account Ledger Audit:** Provides complete visibility into the `balance_history` audit trail for any inspected account.
+The **LedgerFlow clearing desk** is a single floor for an analyst, not a stack of admin tables:
+- **The floor:** each account is a brass bar. Height follows a log of the balance, so a high-net-worth book and a retail book share one view. An open fraud flag turns the plinth crimson. Dragging orbits the desk; clicking a bar opens that account's balance history.
+- **Posting:** payments go through ingestion, which attaches the fraud service's reason before the ledger locks the row. Book transfers hit the ledger directly and move both accounts in one transaction, locking ids in ascending order.
+- **Triage:** unreviewed flags stay ranked with `RANK() OVER (PARTITION BY account_id ORDER BY risk_score DESC)`. Approve leaves the posting in place. Block posts a compensating ledger entry under a deterministic idempotency key and writes the balance back. The original row is kept and marked `REJECTED`.
+- **Authority:** the desk stores no balances of its own. Every figure is read from the ledger.
 
 ---
 
@@ -182,6 +185,7 @@ The **LedgerFlow Operations Dashboard** is engineered around a *triage-first wor
 ## 8. How to Run Locally
 
 ### Option A: Local Run (Maven + Python)
+The launcher prefers Temurin 21 when it is installed, and it creates `venv/` for the Python services.
 1. **Start all services in background:**
    ```bash
    ./scripts/run_all_local.sh
@@ -200,7 +204,7 @@ The **LedgerFlow Operations Dashboard** is engineered around a *triage-first wor
    npm install
    npm run dev
    ```
-   Open `http://localhost:5173` in your browser.
+   Open `http://127.0.0.1:5188` in your browser. Fraud listens on 8010 so it does not collide with other local apps on port 8000.
 5. **Stop all services:**
    ```bash
    ./scripts/stop_all_local.sh
