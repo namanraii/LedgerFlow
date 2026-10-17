@@ -3,6 +3,7 @@ package com.ledgerflow.ledger.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ledgerflow.ledger.domain.Account;
 import com.ledgerflow.ledger.dto.TransactionRequest;
+import com.ledgerflow.ledger.dto.TransferRequest;
 import com.ledgerflow.ledger.repository.AccountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -100,5 +101,41 @@ public class TransactionControllerIntegrationTest {
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("ACCOUNT_NOT_FOUND"));
+    }
+
+    @Test
+    void testFlaggedReportReturnsSeededQueue() throws Exception {
+        mockMvc.perform(get("/api/v1/reports/flagged"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.reason == 'Wire to an unverified beneficiary')].accountHolder").isNotEmpty())
+                .andExpect(jsonPath("$[0].riskRank").exists())
+                .andExpect(jsonPath("$[0].flagId").exists());
+    }
+
+    @Test
+    void testDashboardSummaryIsConsistent() throws Exception {
+        mockMvc.perform(get("/api/v1/dashboard/summary"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accountCount").isNumber())
+                .andExpect(jsonPath("$.assetsUnderManagement").isNumber())
+                .andExpect(jsonPath("$.unreviewedFlags").isNumber());
+    }
+
+    @Test
+    void testBookTransferEndpoint() throws Exception {
+        Account destination = accountRepository.save(new Account("HTTP Transfer Dest", new BigDecimal("40.00")));
+        TransferRequest req = new TransferRequest();
+        req.setIdempotencyKey(UUID.randomUUID());
+        req.setFromAccountId(accountId);
+        req.setToAccountId(destination.getAccountId());
+        req.setAmount(new BigDecimal("25.00"));
+
+        mockMvc.perform(post("/api/v1/transfers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.fromBalanceAfter").value(475.00))
+                .andExpect(jsonPath("$.toBalanceAfter").value(65.00))
+                .andExpect(jsonPath("$.alreadyProcessed").value(false));
     }
 }

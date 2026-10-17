@@ -1,9 +1,9 @@
 package com.ledgerflow.ledger.controller;
 
 import com.ledgerflow.ledger.domain.FraudFlag;
+import com.ledgerflow.ledger.dto.FlaggedReportRow;
 import com.ledgerflow.ledger.dto.FraudFlagRequest;
 import com.ledgerflow.ledger.dto.ReviewFlagRequest;
-import com.ledgerflow.ledger.repository.FraudFlagRepository;
 import com.ledgerflow.ledger.service.FraudFlagService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -33,7 +33,7 @@ public class FraudFlagController {
 
     // Section 10 Reporting Query endpoint
     @GetMapping("/reports/flagged")
-    public ResponseEntity<List<FraudFlagRepository.FlaggedReportProjection>> getFlaggedReport() {
+    public ResponseEntity<List<FlaggedReportRow>> getFlaggedReport() {
         return ResponseEntity.ok(fraudFlagService.getFlaggedReport());
     }
 

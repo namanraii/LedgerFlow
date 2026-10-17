@@ -53,7 +53,7 @@ public class AccountService {
 
     @Transactional(readOnly = true)
     public List<AccountResponse> getAllAccounts() {
-        return accountRepository.findAll().stream()
+        return accountRepository.findAllByOrderByAccountIdAsc().stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }

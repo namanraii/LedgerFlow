@@ -38,6 +38,10 @@ public class TransactionRequest {
     @JsonAlias({"fraud_check_status"})
     private String fraudCheckStatus = "OK";
 
+    @JsonProperty("flagReason")
+    @JsonAlias({"flag_reason"})
+    private String flagReason;
+
     @JsonProperty("safe")
     private boolean safe = true;
 
@@ -60,6 +64,9 @@ public class TransactionRequest {
 
     public String getFraudCheckStatus() { return fraudCheckStatus; }
     public void setFraudCheckStatus(String fraudCheckStatus) { this.fraudCheckStatus = fraudCheckStatus; }
+
+    public String getFlagReason() { return flagReason; }
+    public void setFlagReason(String flagReason) { this.flagReason = flagReason; }
 
     public boolean isSafe() { return safe; }
     public void setSafe(boolean safe) { this.safe = safe; }

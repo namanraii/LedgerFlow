@@ -23,6 +23,9 @@ public class Transaction {
     @Column(name = "account_id", nullable = false)
     private Long accountId;
 
+    @Column(name = "counterparty_account_id")
+    private Long counterpartyAccountId;
+
     @Column(name = "amount", nullable = false, precision = 14, scale = 2)
     private BigDecimal amount;
 
@@ -37,6 +40,9 @@ public class Transaction {
 
     @Column(name = "fraud_check_status", length = 20)
     private String fraudCheckStatus = "OK"; // 'OK' | 'UNAVAILABLE'
+
+    @Column(name = "memo", length = 160)
+    private String memo;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -63,6 +69,9 @@ public class Transaction {
     public Long getAccountId() { return accountId; }
     public void setAccountId(Long accountId) { this.accountId = accountId; }
 
+    public Long getCounterpartyAccountId() { return counterpartyAccountId; }
+    public void setCounterpartyAccountId(Long counterpartyAccountId) { this.counterpartyAccountId = counterpartyAccountId; }
+
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }
 
@@ -77,6 +86,9 @@ public class Transaction {
 
     public String getFraudCheckStatus() { return fraudCheckStatus; }
     public void setFraudCheckStatus(String fraudCheckStatus) { this.fraudCheckStatus = fraudCheckStatus; }
+
+    public String getMemo() { return memo; }
+    public void setMemo(String memo) { this.memo = memo; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

@@ -3,8 +3,11 @@ package com.ledgerflow.ledger.service;
 import com.ledgerflow.ledger.domain.Account;
 import com.ledgerflow.ledger.domain.FraudFlag;
 import com.ledgerflow.ledger.domain.Transaction;
+import com.ledgerflow.ledger.dto.ReviewFlagRequest;
 import com.ledgerflow.ledger.dto.TransactionRequest;
 import com.ledgerflow.ledger.dto.TransactionResponse;
+import com.ledgerflow.ledger.dto.TransferRequest;
+import com.ledgerflow.ledger.dto.TransferResponse;
 import com.ledgerflow.ledger.exception.InsufficientFundsException;
 import com.ledgerflow.ledger.repository.AccountRepository;
 import com.ledgerflow.ledger.repository.BalanceHistoryRepository;
@@ -39,6 +42,9 @@ public class SafeLedgerServiceTest {
 
     @Autowired
     private FraudFlagRepository fraudFlagRepository;
+
+    @Autowired
+    private FraudFlagService fraudFlagService;
 
     private Long testAccountId;
 
@@ -145,5 +151,65 @@ public class SafeLedgerServiceTest {
         List<FraudFlag> unreviewed = fraudFlagRepository.findByReviewedFalseOrderByRiskScoreDesc();
         boolean flagFound = unreviewed.stream().anyMatch(f -> f.getTransactionId().equals(resp.getTransactionId()));
         assertTrue(flagFound, "Durable fraud flag must exist for flagged transaction");
+    }
+
+    @Test
+    void testBlockPostsCompensatingEntryAndRestoresBalance() {
+        TransactionRequest req = new TransactionRequest();
+        req.setIdempotencyKey(UUID.randomUUID());
+        req.setAccountId(testAccountId);
+        req.setAmount(new BigDecimal("100.00"));
+        req.setTransactionType("DEBIT");
+        req.setRiskScore(new BigDecimal("0.91"));
+        req.setFlagReason("Wire to an unverified beneficiary");
+
+        TransactionResponse posted = safeLedgerService.processTransaction(req);
+        assertEquals("FLAGGED", posted.getStatus());
+        assertEquals(0, new BigDecimal("900.00").compareTo(
+                accountRepository.findById(testAccountId).orElseThrow().getBalance()));
+
+        FraudFlag flag = fraudFlagRepository.findByReviewedFalseOrderByRiskScoreDesc().stream()
+                .filter(f -> f.getTransactionId().equals(posted.getTransactionId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("Wire to an unverified beneficiary", flag.getReason());
+
+        fraudFlagService.reviewFlag(flag.getId(), new ReviewFlagRequest("BLOCKED"));
+
+        assertEquals(0, new BigDecimal("1000.00").compareTo(
+                accountRepository.findById(testAccountId).orElseThrow().getBalance()));
+        assertEquals("REJECTED", transactionRepository.findById(posted.getTransactionId()).orElseThrow().getStatus());
+        assertTrue(transactionRepository.findByIdempotencyKey(SafeLedgerService.reversalKey(posted.getTransactionId())).isPresent());
+        assertTrue(balanceHistoryRepository.findByAccountIdOrderByCreatedAtDesc(testAccountId).size() >= 2);
+
+        IllegalArgumentException repeat = assertThrows(IllegalArgumentException.class,
+                () -> fraudFlagService.reviewFlag(flag.getId(), new ReviewFlagRequest("BLOCKED")));
+        assertTrue(repeat.getMessage().contains("already been reviewed"));
+        assertEquals(0, new BigDecimal("1000.00").compareTo(
+                accountRepository.findById(testAccountId).orElseThrow().getBalance()));
+    }
+
+    @Test
+    void testBookTransferLocksBothLegsAndReplays() {
+        Account destination = accountRepository.save(new Account("Transfer Counterparty", new BigDecimal("200.00")));
+        TransferRequest req = new TransferRequest();
+        req.setIdempotencyKey(UUID.randomUUID());
+        req.setFromAccountId(testAccountId);
+        req.setToAccountId(destination.getAccountId());
+        req.setAmount(new BigDecimal("150.00"));
+        req.setMemo("Treasury sweep");
+
+        TransferResponse first = safeLedgerService.transfer(req);
+        assertFalse(first.isAlreadyProcessed());
+        assertEquals(0, new BigDecimal("850.00").compareTo(first.getFromBalanceAfter()));
+        assertEquals(0, new BigDecimal("350.00").compareTo(first.getToBalanceAfter()));
+
+        TransferResponse replay = safeLedgerService.transfer(req);
+        assertTrue(replay.isAlreadyProcessed());
+        assertEquals(first.getDebitTransactionId(), replay.getDebitTransactionId());
+        assertEquals(0, new BigDecimal("850.00").compareTo(
+                accountRepository.findById(testAccountId).orElseThrow().getBalance()));
+        assertEquals(0, new BigDecimal("350.00").compareTo(
+                accountRepository.findById(destination.getAccountId()).orElseThrow().getBalance()));
     }
 }
