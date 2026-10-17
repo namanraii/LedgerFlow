@@ -211,9 +211,11 @@ The launcher prefers Temurin 21 when it is installed, and it creates `venv/` for
    ```
 
 ### Option B: Docker Compose
+Requires a running Docker engine. On this machine that is Colima (`colima start`).
 ```bash
-docker-compose up --build
+docker compose up -d --build
 ```
+The desk is at `http://127.0.0.1:5188`. Fraud is published on 8010. Postgres is on 5432 and RabbitMQ management is on 15672.
 
 ---
 
