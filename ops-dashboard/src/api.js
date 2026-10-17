@@ -1,7 +1,7 @@
-export const LEDGER = 'http://127.0.0.1:8081/api/v1';
-export const INGESTION = 'http://127.0.0.1:8082/api/v1';
-export const FRAUD = 'http://127.0.0.1:8010/api/v1';
-export const NOTIFY = 'http://127.0.0.1:8003/api/v1';
+export const LEDGER = '/svc/ledger/api/v1';
+export const INGESTION = '/svc/ingestion/api/v1';
+export const FRAUD = '/svc/fraud/api/v1';
+export const NOTIFY = '/svc/notify/api/v1';
 
 export async function requestJson(url, options) {
   const response = await fetch(url, options);

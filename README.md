@@ -217,6 +217,8 @@ docker compose up -d --build
 ```
 The desk is at `http://127.0.0.1:5188`. Fraud is published on 8010. Postgres is on 5432 and RabbitMQ management is on 15672.
 
+The desk and the four APIs share one origin. The browser calls `/svc/ledger`, `/svc/ingestion`, `/svc/fraud`, and `/svc/notify`, and the desk proxies those to the services. A public tunnel only needs to expose port 5188.
+
 ---
 
 ## 9. Security Scope & Deliberate Simplifications
