@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -20,7 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class IngestionEngine {
     private static final Logger log = LoggerFactory.getLogger(IngestionEngine.class);
 
-    private final ExecutorService executorService;
+    private final ThreadPoolExecutor executorService;
     private final FraudClient fraudClient;
     private final LedgerClient ledgerClient;
 
@@ -29,19 +31,27 @@ public class IngestionEngine {
 
     public IngestionEngine(FraudClient fraudClient,
                            LedgerClient ledgerClient,
-                           @Value("${ingestion.thread.pool.size:25}") int poolSize) {
+                           @Value("${ingestion.thread.pool.size:25}") int poolSize,
+                           @Value("${ingestion.queue.capacity:200}") int queueCapacity) {
         this.fraudClient = fraudClient;
         this.ledgerClient = ledgerClient;
-        this.executorService = Executors.newFixedThreadPool(poolSize, new ThreadFactory() {
-            private final AtomicLong counter = new AtomicLong(0);
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread t = new Thread(r, "ingestion-worker-" + counter.incrementAndGet());
-                t.setDaemon(true);
-                return t;
-            }
-        });
-        log.info("Initialized IngestionEngine with fixed thread pool of {} workers", poolSize);
+        int workers = Math.max(1, poolSize);
+        int capacity = Math.max(workers, queueCapacity);
+        AtomicLong counter = new AtomicLong(0);
+        this.executorService = new ThreadPoolExecutor(
+                workers,
+                workers,
+                30L,
+                TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(capacity),
+                runnable -> {
+                    Thread thread = new Thread(runnable, "ingestion-worker-" + counter.incrementAndGet());
+                    thread.setDaemon(true);
+                    return thread;
+                },
+                new ThreadPoolExecutor.CallerRunsPolicy()
+        );
+        log.info("Initialized IngestionEngine with {} workers and a bounded queue of {}", workers, capacity);
     }
 
     public CompletableFuture<IngestionResult> processAsync(IngestionRequest req) {
@@ -51,8 +61,9 @@ public class IngestionEngine {
 
             BigDecimal riskScore = fraudResp.map(FraudEvaluationResponse::getRiskScore).orElse(null);
             String fraudStatus = fraudResp.isPresent() ? "OK" : "UNAVAILABLE";
+            String flagReason = fraudResp.map(FraudEvaluationResponse::getReason).orElse(null);
 
-            IngestionResult result = ledgerClient.submitTransactionWithRetry(req, riskScore, fraudStatus);
+            IngestionResult result = ledgerClient.submitTransactionWithRetry(req, riskScore, fraudStatus, flagReason);
 
             totalProcessed.incrementAndGet();
             if ("FAILED_RETRYABLE".equals(result.getStatus())) {
@@ -65,6 +76,18 @@ public class IngestionEngine {
 
     public long getTotalProcessed() { return totalProcessed.get(); }
     public long getTotalErrors() { return totalErrors.get(); }
+
+    public Map<String, Object> metrics() {
+        Map<String, Object> metrics = new LinkedHashMap<>();
+        metrics.put("total_processed", totalProcessed.get());
+        metrics.put("total_errors", totalErrors.get());
+        metrics.put("pool_size", executorService.getPoolSize());
+        metrics.put("active_threads", executorService.getActiveCount());
+        metrics.put("queue_depth", executorService.getQueue().size());
+        metrics.put("queue_capacity", executorService.getQueue().size() + executorService.getQueue().remainingCapacity());
+        metrics.put("status", "ACTIVE");
+        return metrics;
+    }
 
     @PreDestroy
     public void shutdown() {

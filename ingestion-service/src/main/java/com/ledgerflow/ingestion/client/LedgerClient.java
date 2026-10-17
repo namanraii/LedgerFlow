@@ -29,7 +29,7 @@ public class LedgerClient {
     private static final int MAX_RETRIES = 3;
     private static final long[] BACKOFF_MS = {100, 400, 1600};
 
-    public LedgerClient(@Value("${ledger.service.url:http://localhost:8081}") String ledgerServiceUrl,
+    public LedgerClient(@Value("${ledger.service.url:http://127.0.0.1:8081}") String ledgerServiceUrl,
                         ObjectMapper objectMapper) {
         this.ledgerServiceUrl = ledgerServiceUrl;
         this.objectMapper = objectMapper;
@@ -38,7 +38,7 @@ public class LedgerClient {
                 .build();
     }
 
-    public IngestionResult submitTransactionWithRetry(IngestionRequest req, BigDecimal riskScore, String fraudStatus) {
+    public IngestionResult submitTransactionWithRetry(IngestionRequest req, BigDecimal riskScore, String fraudStatus, String flagReason) {
         UUID idempotencyKey = req.getIdempotencyKey();
         String url = String.format("%s/api/v1/transactions", ledgerServiceUrl);
         long startTime = System.currentTimeMillis();
@@ -51,6 +51,9 @@ public class LedgerClient {
         body.put("safe", req.isSafe());
         if (riskScore != null) {
             body.put("riskScore", riskScore);
+        }
+        if (flagReason != null && !flagReason.isBlank()) {
+            body.put("flagReason", flagReason);
         }
         body.put("fraudCheckStatus", fraudStatus);
 

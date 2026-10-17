@@ -28,7 +28,7 @@ public class IngestionEngineTest {
     void setUp() {
         fraudClient = Mockito.mock(FraudClient.class);
         ledgerClient = Mockito.mock(LedgerClient.class);
-        ingestionEngine = new IngestionEngine(fraudClient, ledgerClient, 5);
+        ingestionEngine = new IngestionEngine(fraudClient, ledgerClient, 5, 40);
     }
 
     @Test
@@ -44,7 +44,7 @@ public class IngestionEngineTest {
         mockLedgerResult.setRiskScore(new BigDecimal("0.10"));
         mockLedgerResult.setFraudCheckStatus("OK");
 
-        when(ledgerClient.submitTransactionWithRetry(any(), eq(new BigDecimal("0.10")), eq("OK")))
+        when(ledgerClient.submitTransactionWithRetry(any(), eq(new BigDecimal("0.10")), eq("OK"), eq("NORMAL")))
                 .thenReturn(mockLedgerResult);
 
         CompletableFuture<IngestionResult> future = ingestionEngine.processAsync(req);
@@ -70,7 +70,7 @@ public class IngestionEngineTest {
         mockLedgerResult.setRiskScore(null);
         mockLedgerResult.setFraudCheckStatus("UNAVAILABLE");
 
-        when(ledgerClient.submitTransactionWithRetry(any(), isNull(), eq("UNAVAILABLE")))
+        when(ledgerClient.submitTransactionWithRetry(any(), isNull(), eq("UNAVAILABLE"), isNull()))
                 .thenReturn(mockLedgerResult);
 
         CompletableFuture<IngestionResult> future = ingestionEngine.processAsync(req);

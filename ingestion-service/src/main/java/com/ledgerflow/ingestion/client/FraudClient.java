@@ -24,7 +24,7 @@ public class FraudClient {
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
-    public FraudClient(@Value("${fraud.service.url:http://localhost:8000}") String fraudServiceUrl,
+    public FraudClient(@Value("${fraud.service.url:http://127.0.0.1:8010}") String fraudServiceUrl,
                        ObjectMapper objectMapper) {
         this.fraudServiceUrl = fraudServiceUrl;
         this.objectMapper = objectMapper;
