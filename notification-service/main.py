@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from consumer import alert_store, RabbitMQConsumerThread
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logging.getLogger("pika").setLevel(logging.CRITICAL)
 logger = logging.getLogger("notification-service")
 
 consumer_thread = RabbitMQConsumerThread(alert_store)
@@ -25,7 +27,7 @@ app = FastAPI(title="LedgerFlow Notification Service", version="1.0.0", lifespan
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -38,8 +40,10 @@ def get_alerts():
 async def stream_alerts():
     async def event_generator():
         queue = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+
         def callback(alert):
-            queue.put_nowait(alert)
+            loop.call_soon_threadsafe(queue.put_nowait, alert)
 
         alert_store.subscribe(callback)
         try:
@@ -65,4 +69,4 @@ def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8003)
+    uvicorn.run(app, host="127.0.0.1", port=int(os.getenv("PORT", "8003")))

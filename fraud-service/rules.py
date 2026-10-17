@@ -1,7 +1,7 @@
 import time
 import threading
-from collections import defaultdict
-from typing import Dict, List, Tuple
+from collections import defaultdict, deque
+from typing import Deque, Dict, Tuple
 
 class VelocityTracker:
     """
@@ -10,7 +10,7 @@ class VelocityTracker:
     def __init__(self, window_seconds: float = 60.0, max_allowed: int = 5):
         self.window_seconds = window_seconds
         self.max_allowed = max_allowed
-        self._history: Dict[int, List[float]] = defaultdict(list)
+        self._history: Dict[int, Deque[float]] = defaultdict(deque)
         self._lock = threading.Lock()
 
     def record_and_check(self, account_id: int) -> Tuple[int, float]:
@@ -21,10 +21,10 @@ class VelocityTracker:
         with self._lock:
             timestamps = self._history[account_id]
             cutoff = now - self.window_seconds
-            valid_timestamps = [t for t in timestamps if t > cutoff]
-            valid_timestamps.append(now)
-            self._history[account_id] = valid_timestamps
-            count = len(valid_timestamps)
+            while timestamps and timestamps[0] <= cutoff:
+                timestamps.popleft()
+            timestamps.append(now)
+            count = len(timestamps)
 
         if count > self.max_allowed:
             risk = min(1.0, 0.5 + (count - self.max_allowed) * 0.20)
@@ -53,8 +53,10 @@ def evaluate_amount_anomaly(amount: float) -> Tuple[float, str]:
 def evaluate_round_number_heuristic(amount: float) -> Tuple[float, str]:
     """
     Rule 3: Round Number Heuristic.
+    Compared in cents so binary float residue cannot hide a round dollar amount.
     """
-    if amount >= 2500.0 and amount % 1000.0 == 0.0:
+    cents = int(round(amount * 100))
+    if cents >= 250_000 and cents % 100_000 == 0:
         return 0.40, f"High-value round amount: ${amount:.2f}"
     return 0.0, ""
 

@@ -5,7 +5,7 @@ import uuid
 
 LEDGER_URL = "http://localhost:8081"
 INGESTION_URL = "http://localhost:8082"
-FRAUD_URL = "http://localhost:8000"
+FRAUD_URL = "http://127.0.0.1:8010"
 
 def post_json(url, data_dict):
     data = json.dumps(data_dict).encode()
