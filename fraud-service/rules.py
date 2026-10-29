@@ -76,7 +76,7 @@ def compute_risk_score(account_id: int, amount: float, tracker: VelocityTracker)
     if amount_risk >= 0.50:
         reasons.append(amount_reason)
     if velocity_count > tracker.max_allowed:
-        reasons.append(f"High velocity: {velocity_count} txs in 60s")
+        reasons.append(f"High velocity: {velocity_count} txs in {tracker.window_seconds:g}s")
     if round_risk > 0:
         reasons.append(round_reason)
 

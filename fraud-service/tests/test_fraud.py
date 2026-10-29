@@ -45,3 +45,12 @@ def test_composite_risk_score_flagged():
     score, flagged, reason = compute_risk_score(account_id, 30000.0, tracker)
     assert score >= 0.70
     assert flagged is True
+
+def test_velocity_reason_reports_configured_window():
+    tracker = VelocityTracker(window_seconds=10.0, max_allowed=2)
+    account_id = 202
+    tracker.record_and_check(account_id)
+    tracker.record_and_check(account_id)
+
+    _, _, reason = compute_risk_score(account_id, 100.0, tracker)
+    assert "High velocity: 3 txs in 10s" in reason
