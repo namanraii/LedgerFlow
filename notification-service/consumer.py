@@ -21,15 +21,24 @@ class AlertBuffer:
         self.lock = threading.Lock()
         self.listeners = []
 
-    def add(self, alert: dict):
+    def add(self, alert: dict) -> bool:
+        """Buffers a copy of the alert and notifies listeners.
+
+        Returns False (and buffers nothing) when the alert is not a JSON object,
+        so a stray array/string/null on the queue cannot reach the dashboard.
+        The caller's dict is never mutated.
+        """
+        if not isinstance(alert, dict):
+            return False
+        alert = {**alert, "received_at": time.time()}
         with self.lock:
-            alert["received_at"] = time.time()
             self.buffer.appendleft(alert)
             for listener in list(self.listeners):
                 try:
                     listener(alert)
                 except Exception as e:
                     logger.debug(f"Error notifying listener: {e}")
+        return True
 
     def get_all(self):
         with self.lock:
@@ -75,8 +84,10 @@ class RabbitMQConsumerThread(threading.Thread):
                     if body:
                         try:
                             payload = json.loads(body.decode("utf-8"))
-                            self.alert_buffer.add(payload)
-                            logger.info(f"Consumed fraud alert for account {payload.get('account_id')}")
+                            if self.alert_buffer.add(payload):
+                                logger.info(f"Consumed fraud alert for account {payload.get('account_id')}")
+                            else:
+                                logger.warning(f"Dropped alert message that is not a JSON object: {type(payload).__name__}")
                         except Exception as e:
                             logger.error(f"Error parsing alert message: {e}")
 
